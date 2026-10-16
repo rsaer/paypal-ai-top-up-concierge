@@ -1,0 +1,26 @@
+{
+  "name": "paypal-ai-top-up-concierge",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "An AI concierge that tops up an event wallet through PayPal — Gemini agent + PayPal Agent Toolkit, with a double-entry ledger and idempotency guarantees.",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "demo": "tsx demo/demo.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@ai-sdk/google": "^4.0.98",
+    "@paypal/agent-toolkit": "^1.11.0",
+    "ai": "^7.0.142",
+    "dotenv": "^16.4.5",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.3"
+  }
+}

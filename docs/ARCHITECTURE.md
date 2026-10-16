@@ -1,0 +1,34 @@
+# Architecture notes
+
+This repository is a **standalone extract** of the reusable core of a production feature. The full implementation lives in a private monorepo (Medusa v2 + Next.js + Expo), where the concierge runs as a server-orchestrated route with real wallets, tenants, and Postgres-backed ledgers. This file maps the extract back to that production code so reviewers can see what's real vs. simplified for the demo.
+
+## Production → extract mapping
+
+| Concern | Production (private) | This extract |
+|---|---|---|
+| AI agent | `generateText` + Gemini (`@ai-sdk/google`) in a Medusa API route | same, in `demo/demo.ts` |
+| Tools | `get_event_menu`, `create_topup_order`, `capture_topup_order` in `paypal-payment/concierge.ts` | `src/concierge.ts` (identical logic) |
+| Confirmation gate | `hasExplicitConfirmation` in the `create_topup_order` tool | `src/confirmation.ts` (identical) |
+| Menu pricing | Medusa storefront catalog (products + variants + prices, tenant-scoped) | an in-memory `menu` array |
+| PayPal calls | `@paypal/agent-toolkit` (`create_order`/`pay_order`/`get_order`), per-order `request_id` idempotency | `src/paypal.ts` (identical) |
+| Wallet + ledger | Medusa `wallet` module: `postTransaction` + `getOrCreateSystemAccount`, Postgres append-only trigger, `paypal_clearing` system account | `src/ledger.ts` (in-memory, same invariants) |
+| Idempotency | `paypal:{captureId}:topup` idempotency key + intent-status check | same key, enforced in `Ledger.post` |
+
+## The invariants that carry over
+
+1. **Money is integer minor units + ISO code** — never floats, never mixed currencies in one wallet.
+2. **The ledger is append-only double-entry** — corrections are new reversing entries; cached balances are rebuildable.
+3. **Every value-moving call is idempotent** — `paypal:{captureId}:topup`; a redelivered webhook or a retried tool call can never double-credit.
+4. **Confirmation is enforced, not prompted** — `create_topup_order` checks the conversation itself.
+5. **Card data never reaches the backend** — PayPal's hosted approval step handles it; only PayPal order/capture IDs flow back.
+
+## What's simplified here (and why)
+
+- **In-memory wallet/ledger** instead of Postgres — so `npm install && npm run demo` works with zero infrastructure.
+- **Hardcoded menu** instead of a live catalog — the `menu` function is the seam; swap it for a DB query in production.
+- **Sandbox-only, USD-only** — the Agent Toolkit's `create_order` enum is USD-only; the demo is intentionally sandbox-scoped.
+- **`get_merchant_insights`** is present in the toolkit but returns "not supported in sandbox"; `list_transactions` is the usable reporting surface.
+
+## Production integration (reference)
+
+In the full backend, the concierge is `POST /portal/wallets/:id/paypal-concierge`, authenticated as the attendee's own customer, with the organizer's PayPal credentials sealed at rest (AES-256-GCM) and unsealed server-side. A parallel `paypal-payment` module owns `paypal_connection`, `paypal_topup_intent`, and `paypal_webhook_event` tables, and credits the wallet through the same `postTransaction` seam Square uses. There's also an organizer-facing **PayPal Insights** admin surface (Gemini + the toolkit's `list_transactions`), scoped to the asking organizer's own account.

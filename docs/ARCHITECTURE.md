@@ -31,6 +31,10 @@ This repository is a **standalone extract** of the reusable core of a production
 - **Sandbox-only, USD-only** — the Agent Toolkit's `create_order` enum is USD-only; the demo is intentionally sandbox-scoped.
 - **`get_merchant_insights`** is present in the toolkit but returns "not supported in sandbox"; `list_transactions` is the usable reporting surface.
 
+## Dependency security
+
+`@paypal/agent-toolkit` bundles its own older copies of `ai` (v4, for a LangChain/React adapter this repo never imports — only the `/ai-sdk` subpath is used), `@langchain/core`, `langsmith`, `mathjs`, `jsondiffpatch`, and `uuid`. GitHub's Dependabot flagged known advisories in all of them. `package.json`'s `overrides` field forces each one up to its earliest patched release, scoped specifically to `@paypal/agent-toolkit`'s own dependency subtree so it can't collide with `@ai-sdk/google`'s separate, newer copies of the same package names (an earlier, unscoped attempt at this broke `@ai-sdk/google` outright — scoping fixed it). One advisory remains unresolved: the nested `ai@4.x` copy has a file-upload filetype-whitelist bypass with no patched 4.x release available upstream; this repo never calls any file-upload tool, so it's a known, accepted residual rather than something actively exploitable here.
+
 ## Production integration (reference)
 
 In the full backend, the concierge is `POST /portal/wallets/:id/paypal-concierge`, authenticated as the attendee's own customer, with the organizer's PayPal credentials sealed at rest (AES-256-GCM) and unsealed server-side. A parallel `paypal-payment` module owns `paypal_connection`, `paypal_topup_intent`, and `paypal_webhook_event` tables, and credits the wallet through the same `postTransaction` seam Square uses. There's also an organizer-facing **PayPal Insights** admin surface (Gemini + the toolkit's `list_transactions`), scoped to the asking organizer's own account.

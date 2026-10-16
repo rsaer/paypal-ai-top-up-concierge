@@ -10,7 +10,8 @@ This repository is a **standalone extract** of the reusable core — the agent, 
 
 | Piece | Where | Why it matters |
 |---|---|---|
-| AI concierge | `src/concierge.ts` | Three tools (`get_event_menu`, `create_topup_order`, `capture_topup_order`) driven by Gemini via the Vercel AI SDK |
+| AI concierge | `src/concierge.ts` | Four tools (`get_spend_summary`, `get_event_menu`, `create_topup_order`, `capture_topup_order`) driven by Gemini via the Vercel AI SDK |
+| Proactive suggestion | `src/concierge.ts` (`suggestTopupAmount`) | Before the attendee names anything, the concierge reads their own spend history and proposes a top-up — clamped to a sane range, with a flat default for a first-time attendee |
 | Confirmation gate | `src/confirmation.ts` | An order is never created until the attendee explicitly confirms the amount — enforced in the tool, not just the prompt |
 | Money rules | `src/money.ts` | All amounts are integer minor units (cents); conversion to major units happens in one place |
 | Double-entry ledger | `src/ledger.ts` | Balanced entries + idempotent replay (one credit per `paypal:{captureId}:topup` key) |
@@ -39,26 +40,38 @@ npm install
 npm run demo
 ```
 
-Then try:
+The demo starts with a simulated $18-spent-30-minutes-ago scenario (set `DEMO_FRESH_WALLET=true` to see a first-time attendee instead). Say "hi" and the concierge opens with a suggestion based on that history:
+
+```
+you> hi
+concierge> … You've spent $18 so far tonight — want me to add $90 to cover the rest of the night?
+you> yes
+concierge> … Open this approval link: https://www.sandbox.paypal.com/checkoutnow?token=…
+# open the link in a browser, log in with a sandbox *personal* (buyer) account, approve
+you> I've approved
+concierge> … captured and credited.
+[wallet cash balance: $102.00]
+```
+
+Or name specific items — that total replaces the suggestion:
 
 ```
 you> two IPAs and a cheeseburger, how much should I add?
 concierge> … That'll be $29.00. Would you like me to create the order?
 you> yes
 concierge> … Open this approval link: https://www.sandbox.paypal.com/checkoutnow?token=…
-# open the link in a browser, log in with a sandbox *personal* (buyer) account, approve
 you> I've approved
 concierge> … captured and credited.
-[wallet cash balance: $29.00]
 ```
 
 **Tip:** to approve the order you need a sandbox *personal* account. In the PayPal Developer Dashboard, go to **Testing Tools → Sandbox Accounts** and use the `@personal.example.com` account's credentials to log in at the approval link.
 
 ## How it works
 
-1. The `get_event_menu` tool returns the event's real prices (never invented by the model).
-2. `create_topup_order` refuses to fire until the attendee's latest message is an explicit confirmation, then calls PayPal's `create_order` through the Agent Toolkit and returns the hosted approval URL.
-3. After the buyer approves, `capture_topup_order` captures the order and credits the wallet via the ledger: `paypal_clearing` (debit) → wallet cash (credit), keyed `paypal:{captureId}:topup` so a redelivered capture can never double-credit.
+1. `get_spend_summary` reads the attendee's own spend history for this event and proposes a top-up amount, clamped to a sane range — a first-time attendee gets a flat default instead of a fabricated figure.
+2. The `get_event_menu` tool returns the event's real prices (never invented by the model); if the attendee names items, that total takes over from the suggestion.
+3. `create_topup_order` refuses to fire until the attendee's latest message is an explicit confirmation, then calls PayPal's `create_order` through the Agent Toolkit and returns the hosted approval URL.
+4. After the buyer approves, `capture_topup_order` captures the order and credits the wallet via the ledger: `paypal_clearing` (debit) → wallet cash (credit), keyed `paypal:{captureId}:topup` so a redelivered capture can never double-credit.
 
 The Agent Toolkit's `create_order` only supports **USD** in sandbox, so the demo menu is priced in USD.
 

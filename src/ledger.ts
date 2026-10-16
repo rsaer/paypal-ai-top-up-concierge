@@ -13,6 +13,7 @@ export type PostedTransaction = {
   type: string;
   idempotency_key: string;
   entries: LedgerEntryInput[];
+  posted_at: Date;
 };
 
 /**
@@ -24,7 +25,7 @@ export class Ledger {
   private transactions = new Map<string, PostedTransaction>();
   private balances = new Map<string, number>();
 
-  post(type: string, idempotencyKey: string, entries: LedgerEntryInput[]): PostedTransaction {
+  post(type: string, idempotencyKey: string, entries: LedgerEntryInput[], postedAt: Date = new Date()): PostedTransaction {
     const existing = this.transactions.get(idempotencyKey);
     if (existing) return existing; // idempotent replay returns the original
 
@@ -48,12 +49,33 @@ export class Ledger {
       this.balances.set(entry.account_id, (this.balances.get(entry.account_id) ?? 0) + delta);
     }
 
-    const txn: PostedTransaction = { id: randomUUID(), type, idempotency_key: idempotencyKey, entries };
+    const txn: PostedTransaction = { id: randomUUID(), type, idempotency_key: idempotencyKey, entries, posted_at: postedAt };
     this.transactions.set(idempotencyKey, txn);
     return txn;
   }
 
   balance(accountId: string): number {
     return this.balances.get(accountId) ?? 0;
+  }
+
+  /** Sum of all debit entries ever posted against an account — the basis for a spend summary. */
+  debitTotal(accountId: string): number {
+    let total = 0;
+    for (const txn of this.transactions.values()) {
+      for (const entry of txn.entries) {
+        if (entry.account_id === accountId && entry.direction === "debit") total += entry.amount_minor;
+      }
+    }
+    return total;
+  }
+
+  /** Earliest posting time of a debit entry against an account, or null if there has never been one. */
+  firstDebitAt(accountId: string): Date | null {
+    let earliest: Date | null = null;
+    for (const txn of this.transactions.values()) {
+      const isDebit = txn.entries.some((entry) => entry.account_id === accountId && entry.direction === "debit");
+      if (isDebit && (!earliest || txn.posted_at < earliest)) earliest = txn.posted_at;
+    }
+    return earliest;
   }
 }

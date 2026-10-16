@@ -7,7 +7,8 @@ This repository is a **standalone extract** of the reusable core of a production
 | Concern | Production (private) | This extract |
 |---|---|---|
 | AI agent | `generateText` + Gemini (`@ai-sdk/google`) in a Medusa API route | same, in `demo/demo.ts` |
-| Tools | `get_event_menu`, `create_topup_order`, `capture_topup_order` in `paypal-payment/concierge.ts` | `src/concierge.ts` (identical logic) |
+| Tools | `get_spend_summary`, `get_event_menu`, `create_topup_order`, `capture_topup_order` in `paypal-payment/concierge.ts` | `src/concierge.ts` (identical logic) |
+| Proactive suggestion | `suggestTopupAmount` reads the wallet's own ledger (`WalletModuleService.getSpendSummary`), clamped to `$10`–`$100`, `$25` default for no history | `src/concierge.ts` (`suggestTopupAmount`), seeded from a simulated in-memory spend history in `demo/demo.ts` |
 | Confirmation gate | `hasExplicitConfirmation` in the `create_topup_order` tool | `src/confirmation.ts` (identical) |
 | Menu pricing | Medusa storefront catalog (products + variants + prices, tenant-scoped) | an in-memory `menu` array |
 | PayPal calls | `@paypal/agent-toolkit` (`create_order`/`pay_order`/`get_order`), per-order `request_id` idempotency | `src/paypal.ts` (identical) |
@@ -21,6 +22,7 @@ This repository is a **standalone extract** of the reusable core of a production
 3. **Every value-moving call is idempotent** — `paypal:{captureId}:topup`; a redelivered webhook or a retried tool call can never double-credit.
 4. **Confirmation is enforced, not prompted** — `create_topup_order` checks the conversation itself.
 5. **Card data never reaches the backend** — PayPal's hosted approval step handles it; only PayPal order/capture IDs flow back.
+6. **The server never trusts the model for a fact it already knows.** In testing, Gemini occasionally omitted required tool arguments (`currency` on `create_topup_order`, `order_id` on `capture_topup_order`) entirely. Both now default server-side — `currency` to this sandbox's only supported currency, `order_id` to the conversation's own most-recently-created order — rather than letting a missing model argument silently fail a money-moving call.
 
 ## What's simplified here (and why)
 

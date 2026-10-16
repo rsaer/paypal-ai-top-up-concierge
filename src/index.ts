@@ -1,4 +1,12 @@
-export { buildConciergeTools, type ConciergeContext, type ConciergeWallet } from "./concierge.js";
+export {
+  buildConciergeTools,
+  suggestTopupAmount,
+  type ConciergeContext,
+  type ConciergeWallet,
+  type SpendSummary,
+  type SuggestionInput,
+  type SuggestionResult,
+} from "./concierge.js";
 export { isExplicitConfirmation, hasExplicitConfirmation } from "./confirmation.js";
 export { majorToMinor, minorToMajorParts, currencyDecimals, assertSafeInteger } from "./money.js";
 export { Ledger } from "./ledger.js";

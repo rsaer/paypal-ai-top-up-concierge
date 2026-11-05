@@ -96,6 +96,26 @@ The Agent Toolkit's `create_order` only supports **USD** in sandbox, so the demo
 └── .env.example
 ```
 
+## Built with
+
+**PayPal**
+
+- **PayPal Sandbox** — a free sandbox REST app plus a sandbox personal buyer account. All payments are sandbox payments; no real money moves.
+- **PayPal Agent Toolkit** (`@paypal/agent-toolkit/ai-sdk`) — exposes PayPal order actions to the model as tools. Scoped to order create, capture and get. `create_order` makes the order and returns the hosted approval link, `pay_order` captures it, and `get_order` recovers an order that was already captured.
+- **PayPal hosted checkout** — the attendee approves on PayPal's own page, so this code never handles their PayPal credentials.
+
+**AI**
+
+- **Gemini** (`gemini-3.8-flash`) through the **Vercel AI SDK** (`ai`) and `@ai-sdk/google`. Gemini understands what the attendee wants to buy, explains the proposed total, and chooses which of the four tools to call. It is the only model that runs in the product.
+
+**Other libraries**
+
+- TypeScript and Node.js 20+, `tsx` to run the demo, `zod` to validate tool inputs, `dotenv` for local configuration.
+
+**Sponsor integrations:** none. This project does not use APIMatic, Postman/Astro or Render.
+
+**AI assistance in development:** Claude Code and Codex helped write the code. They are development tools and are not part of the running application.
+
 ## License
 
 MIT — see [LICENSE](LICENSE).
